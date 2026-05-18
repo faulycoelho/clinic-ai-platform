@@ -1,8 +1,8 @@
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: clinic_postgres
     environment:
-      POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -16,8 +16,14 @@ services:
     build:
       context: ./backend
       dockerfile: src/Clinic.API/Dockerfile
+    container_name: clinic_api
     environment:
       - ConnectionStrings__DefaultConnection=${POSTGRES_HOST}=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - STORAGE__ENDPOINT=${STORAGE_ENDPOINT}
+      - STORAGE__ACCESSKEY=${STORAGE_ACCESSKEY}
+      - STORAGE__SECRETKEY=${STORAGE_SECRETKEY}
+      - STORAGE__BUCKET=${STORAGE_BUCKET}
+      - STORAGE__USESSL=${STORAGE_USESSL}
     ports:
       - "5000:8080"     
     depends_on:
@@ -25,8 +31,25 @@ services:
     networks:
       - clinic-network
 
+  minio:
+    image: minio/minio:latest
+    container_name: clinic_minio
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESSKEY}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRETKEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - clinic-network
+
 networks:
   clinic-network:
     driver: bridge      
+
 volumes:
-  pgdata:    
+  pgdata:   
+  minio_data: 

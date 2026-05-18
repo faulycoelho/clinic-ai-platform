@@ -1,6 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="Clinic.Application/Clinic.Application.csproj" Id="539d039c-9dae-4fa4-a617-1f45f12a246b" />
     <Project Path="src/Clinic.API/Clinic.API.csproj" Id="0d2e3670-4cbb-42e3-bcac-11f72381fa26" />
+    <Project Path="src/Clinic.Domain/Clinic.Domain.csproj" Id="9b135e37-7c51-467b-aa30-57f0030fab20" />
+    <Project Path="src/Clinic.Infrastructure/Clinic.Infrastructure.csproj" Id="ebd3fdcb-1fa6-4f51-8213-80a3e101f16d" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Clinic.Tests/Clinic.Tests.csproj" Id="5f6ac483-16de-49f7-acee-f164a12ef054" />
+  </Folder>
 </Solution>
