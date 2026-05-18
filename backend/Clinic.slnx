@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Clinic.API/Clinic.API.csproj" Id="0d2e3670-4cbb-42e3-bcac-11f72381fa26" />
+  </Folder>
+  <Folder Name="/tests/" />
+</Solution>
