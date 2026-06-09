@@ -25,6 +25,8 @@ namespace Clinic.Infrastructure
             services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();
             services.AddScoped<IKnowledgeDocumentChunkRepository, KnowledgeDocumentChunkRepository>();
             services.AddScoped<IConversationRepository, ConversationRepository>();
+            services.AddScoped<IServiceRepository, ServiceRepository>();
+            services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 
             // LLM Provider:
             var llmSection = configuration.GetSection("LLM");
@@ -76,6 +78,8 @@ namespace Clinic.Infrastructure
             // Application Services
             services.AddScoped<IKnowledgeDocumentService, KnowledgeDocumentService>();
             services.AddScoped<IConversationService, ConversationService>();
+            services.AddScoped<IServiceService, ServiceService>();
+            services.AddScoped<IAppointmentService, AppointmentService>();
             services.AddScoped<ChunkService>();
 
             return services;

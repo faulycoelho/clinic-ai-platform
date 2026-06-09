@@ -21,11 +21,14 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
+    await DatabaseSeeder.SeedAsync(scope.ServiceProvider);
 }
 
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseHttpsRedirection();
 app.MapKnowledgeDocuments();
 app.MapConversation();
+app.MapAppointment();
+app.MapService();
 
 app.Run();
