@@ -80,6 +80,7 @@ namespace Clinic.Infrastructure
             services.AddScoped<IConversationService, ConversationService>();
             services.AddScoped<IServiceService, ServiceService>();
             services.AddScoped<IAppointmentService, AppointmentService>();
+            services.AddScoped<IChatService, ChatService>();
             services.AddScoped<ChunkService>();
 
             return services;

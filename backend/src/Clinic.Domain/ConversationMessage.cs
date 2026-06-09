@@ -9,7 +9,6 @@ namespace Clinic.Domain
         public int ConversationId { get; private set; }
         public MessageRole Role { get; private set; }
         public string Content { get; private set; } = string.Empty;
-        public string? ExternalMessageId { get; private set; }
         public DateTime CreatedAt { get; private set; }
 
         private ConversationMessage() { }
@@ -25,7 +24,6 @@ namespace Clinic.Domain
                 ConversationId = conversationId,
                 Role = role,
                 Content = content.Trim(),
-                ExternalMessageId = externalMessageId?.Trim(),
                 CreatedAt = DateTime.UtcNow
             };
         }

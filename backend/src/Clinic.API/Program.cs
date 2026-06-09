@@ -30,5 +30,6 @@ app.MapKnowledgeDocuments();
 app.MapConversation();
 app.MapAppointment();
 app.MapService();
+app.MapChat();
 
 app.Run();
