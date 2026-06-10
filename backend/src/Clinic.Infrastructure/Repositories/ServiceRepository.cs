@@ -45,6 +45,7 @@ namespace Clinic.Infrastructure.Repositories
 
         public async Task<bool> ExistsAsync(int id, CancellationToken ct = default)
             => await db.Services.AnyAsync(s => s.Id == id, ct);
+        public async Task<bool> HasAnyAsync(CancellationToken ct = default)
+            => await db.Services.AnyAsync(ct);
     }
-
 }

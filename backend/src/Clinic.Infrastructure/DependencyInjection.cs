@@ -19,7 +19,10 @@ namespace Clinic.Infrastructure
           IConfiguration configuration)
         {
             services.AddDbContext<AppDbContext>(options =>
-              options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+              options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection"),
+                o => o.UseVector()
+              ));
 
             // Repositories
             services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();

@@ -11,5 +11,6 @@ namespace Clinic.Application.Interfaces
         Task<Service> UpdateAsync(Service service, CancellationToken ct = default);
         Task DeleteAsync(int id, CancellationToken ct = default);
         Task<bool> ExistsAsync(int id, CancellationToken ct = default);
+        Task<bool> HasAnyAsync(CancellationToken ct = default);
     }
 }

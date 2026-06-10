@@ -7,6 +7,7 @@ namespace Clinic.Application.Services
 {
     public class ChatService(
         IConversationRepository conversationRepository,
+        IKnowledgeDocumentChunkRepository  knowledgeDocumentChunkRepository,
         ILLMProvider llmProvider
         ) : IChatService
     {
@@ -33,7 +34,7 @@ namespace Clinic.Application.Services
             * Do not provide medical diagnoses.
             * Do not prescribe medications or treatments.
             * Do not invent information about doctors, schedules, services, pricing, or insurance coverage.
-            * If information is unavailable, explain that a member of the clinic staff will assist further.
+            * If information is unavailable, explain that a member of the clinic staff will assist further.            
             * If the patient describes a medical emergency, advise them to contact emergency services or seek immediate medical attention.
 
             Workflow:
@@ -74,7 +75,7 @@ namespace Clinic.Application.Services
                 conversation.Id, MessageRole.User, message.Content);
             conversation.AddMessage(userMsg);
 
-            var llmMessage = await CallChatLlm(message.Content, conversation);
+            var llmMessage = await CallChatLlmWithRag(message.Content, conversation);
 
             var assistantMsg = ConversationMessage.Create(
                 conversation.Id, MessageRole.Assistant, llmMessage);
@@ -84,14 +85,40 @@ namespace Clinic.Application.Services
 
             return new ChatMessageResponseDto(conversation.Id, llmMessage);
         }
-
-        private async Task<string> CallChatLlm(string userMessage, Conversation conversation)
+     
+        private async Task<string> CallChatLlmWithRag(string userMessage, Conversation conversation, CancellationToken ct = default)
         {
+            var userMessageEmb = await llmProvider.GenerateEmbeddingAsync(userMessage, ct);
+            var docs = await knowledgeDocumentChunkRepository.SearchByVectorAsync(userMessageEmb);
+            var context = string.Join("\n\n", docs);
+
+            var promptFinal = $"""
+                You are a question-answering assistant.
+
+                Strict rules:
+                - Answer ONLY using information explicitly contained in the provided context.
+                - Do NOT use prior knowledge, assumptions, or external information.
+                - Do NOT infer or extrapolate beyond what is directly stated.
+                - Every factual statement must include a citation to the source from which it was derived.
+                - If multiple sources support a statement, cite all relevant sources.
+                - If the answer cannot be found explicitly in the context, respond exactly with:
+                  "The requested information is not available in the provided context."
+                - Never fabricate citations.
+
+                Context:
+                {context}
+
+                Question:
+                {userMessage}
+
+                Answer:
+                """;
+
             var request = new LlmChatRequest
             {
                 SystemPrompt = CONFIG_SYSTEM_PROMPT,
                 History = conversation.Messages,
-                UserMessage = userMessage
+                UserMessage = promptFinal
             };
 
             var response = await llmProvider.ChatAsync(request);

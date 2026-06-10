@@ -52,5 +52,7 @@ namespace Clinic.Infrastructure.Repositories
                 await db.SaveChangesAsync(ct);
             }
         }
+        public async Task<bool> HasAnyAsync(CancellationToken ct = default)
+        => await db.KnowledgeDocuments.AnyAsync(ct);
     }
 }

@@ -2,11 +2,12 @@
 using Clinic.Domain;
 using Clinic.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 
 namespace Clinic.Infrastructure.Repositories
 {
-    public class KnowledgeDocumentChunkRepository(AppDbContext db) : IKnowledgeDocumentChunkRepository
+    public class KnowledgeDocumentChunkRepository(AppDbContext db, IConfiguration config) : IKnowledgeDocumentChunkRepository
     {
         public async Task<KnowledgeDocumentChunk> AddAsync(KnowledgeDocumentChunk docChunk, CancellationToken ct = default)
         {
@@ -21,20 +22,18 @@ namespace Clinic.Infrastructure.Repositories
             await db.SaveChangesAsync(ct);
             return docChunk;
         }
-        public async Task<IEnumerable<KnowledgeDocumentChunk>> SearchByVectorAsync(float[] queryEmbedding, int topK = 3)
+        public async Task<List<string>> SearchByVectorAsync(float[] queryEmbedding, int topK = 3)
         {
-            var queryVector = new Pgvector.Vector(queryEmbedding);
-
-            return await db.KnowledgeDocumentChunks
-                .FromSqlRaw(
-                    """
-                SELECT * FROM documents
-                WHERE embedding IS NOT NULL
-                ORDER BY embedding <=> {0}::vector
-                LIMIT {1}
-                """,
-                    queryVector, topK)
-                .ToListAsync();
+            return await db.Database
+            .SqlQuery<string>(
+                $"""
+                SELECT "Content"
+                FROM "KnowledgeDocumentChunks"
+                WHERE "Embedding" IS NOT NULL
+                ORDER BY "Embedding" <=> {queryEmbedding}::vector
+                LIMIT {topK}
+                """)
+             .ToListAsync();
         }
     }
 }

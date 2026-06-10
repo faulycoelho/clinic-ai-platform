@@ -10,5 +10,6 @@ namespace Clinic.Application.Interfaces
         Task<KnowledgeDocument> AddAsync(KnowledgeDocument doc, CancellationToken ct = default);
         Task<KnowledgeDocument> UpdateAsync(KnowledgeDocument doc, CancellationToken ct = default);
         Task DeleteAsync(int id, CancellationToken ct = default);
+        Task<bool> HasAnyAsync(CancellationToken ct = default);
     }
 }

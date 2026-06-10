@@ -1,5 +1,6 @@
 ﻿using Clinic.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Clinic.Infrastructure.Data
 {
@@ -18,7 +19,25 @@ namespace Clinic.Infrastructure.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.HasPostgresExtension("vector");
+
             base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        }
+    }
+
+    public class KnowledgeDocumentChunkConfiguration
+    : IEntityTypeConfiguration<KnowledgeDocumentChunk>
+    {
+        public void Configure(EntityTypeBuilder<KnowledgeDocumentChunk> builder)
+        {
+            builder.ToTable("KnowledgeDocumentChunks");
+
+            builder.Property(x => x.Embedding)
+               .HasConversion(
+                   v => new Pgvector.Vector(v),
+                   v => v.ToArray())
+               .HasColumnType("vector(3072)");
         }
     }
 }

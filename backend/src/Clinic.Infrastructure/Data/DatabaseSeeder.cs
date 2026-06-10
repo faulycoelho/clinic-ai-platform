@@ -1,6 +1,7 @@
 ﻿using Clinic.Application.Interfaces;
 using Clinic.Domain;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Clinic.Infrastructure.Data
 {
@@ -8,11 +9,57 @@ namespace Clinic.Infrastructure.Data
     {
         public static async Task SeedAsync(IServiceProvider services)
         {
+            await SeedServices(services);
+            await SeedDocs(services);
+        }
+        private static async Task SeedDocs(IServiceProvider services)
+        {
+            var docsPath = ResolveDocsPath();
+            if (string.IsNullOrWhiteSpace(docsPath))
+                return;
+
+            var knowledgeDocumentRepository = services.GetRequiredService<IKnowledgeDocumentRepository>();
+            var hasAny = await knowledgeDocumentRepository.HasAnyAsync();
+            if (hasAny)
+            {
+                return;
+            }
+
+            var files = Directory.GetFiles(docsPath, "*.pdf", SearchOption.TopDirectoryOnly);
+            if (files.Length == 0)
+                return;
+
+            var knowledgeDocumentService = services.GetRequiredService<IKnowledgeDocumentService>();
+            foreach (var filePath in files.OrderBy(f => f))
+            {
+                var fileInfo = new FileInfo(filePath);
+
+                await using var stream = File.OpenRead(filePath);
+
+                await knowledgeDocumentService.UploadAsync(
+                    title: Path.GetFileNameWithoutExtension(filePath),
+                    description: "Seed document",
+                    fileName: fileInfo.Name,
+                    contentType: "application/pdf",
+                    fileStream: stream,
+                    fileSize: fileInfo.Length);
+            }
+        }
+
+        private static string? ResolveDocsPath()
+        {
+            var fromCwd = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "docs"));
+            if (Directory.Exists(fromCwd))
+                return fromCwd;
+
+            return null;
+        }
+
+        private static async Task SeedServices(IServiceProvider services)
+        {
             var repository = services.GetRequiredService<IServiceRepository>();
-
-            var existing = await repository.GetAllAsync();
-
-            if (existing.Any())
+            var hasAny = await repository.HasAnyAsync();
+            if (hasAny)
                 return;
 
             var servicesList = new[]
