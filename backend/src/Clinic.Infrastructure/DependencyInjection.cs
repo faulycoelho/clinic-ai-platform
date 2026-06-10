@@ -85,7 +85,18 @@ namespace Clinic.Infrastructure
             services.AddScoped<IAppointmentService, AppointmentService>();
             services.AddScoped<IChatService, ChatService>();
             services.AddScoped<ChunkService>();
+            services.AddScoped<ConversationToolRegistry>();
 
+            var tools = typeof(IConversationTool).Assembly
+            .GetTypes()
+            .Where(t =>
+                !t.IsAbstract &&
+                typeof(IConversationTool).IsAssignableFrom(t));
+
+            foreach (var tool in tools)
+            {
+                services.AddScoped(typeof(IConversationTool), tool);
+            }
             return services;
         }
     }

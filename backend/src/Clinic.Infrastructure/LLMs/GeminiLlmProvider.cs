@@ -23,11 +23,14 @@ namespace Clinic.Infrastructure.LLMs
         public async Task<LlmResponse> ChatAsync(LlmChatRequest request, CancellationToken ct = default)
         {
             var contents = BuildContents(request);
+            var tools = BuildTools(request.Tools);
             var systemInstruction = new { parts = new[] { new { text = request.SystemPrompt } } };
 
             var generationConfig = new { maxOutputTokens = _llmOptions.MaxTokens };
 
-            var payload =  new { contents, systemInstruction, generationConfig };
+            var payload = tools.Count > 0
+                ? (object)new { contents, tools, systemInstruction, generationConfig }
+                : new { contents, systemInstruction, generationConfig };
 
             var model = _llmOptions.Model;
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_llmOptions.ApiKey}";
@@ -43,6 +46,24 @@ namespace Clinic.Infrastructure.LLMs
 
             var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
             return ParseResponse(json);
+        }
+
+        internal static List<object> BuildTools(IReadOnlyList<LlmToolDefinition> tools)
+        {
+            if (tools.Count == 0) return [];
+
+            var functionDeclarations = tools.Select(t =>
+            {
+                var schema = JsonSerializer.Deserialize<JsonElement>(t.ParametersJsonSchema);
+                return (object)new
+                {
+                    name = t.Name,
+                    description = t.Description,
+                    parameters = schema
+                };
+            }).ToList();
+
+            return [new { functionDeclarations }];
         }
 
         internal static List<object> BuildContents(LlmChatRequest request)
@@ -61,7 +82,46 @@ namespace Clinic.Infrastructure.LLMs
                 contents.Add(new { role, parts = new[] { new { text = msg.Content } } });
             }
 
-            contents.Add(new { role = "user", parts = new[] { new { text = request.UserMessage } } });             
+            contents.Add(new { role = "user", parts = new[] { new { text = request.UserMessage } } });
+
+            if (request.PreviousAssistantToolCalls is { Count: > 0 } toolCalls
+                && request.ToolResults is { Count: > 0 } toolResults)
+            {
+                var modelParts = toolCalls.Select(tc =>
+                    tc.RawPartJson is not null
+                        ? JsonSerializer.Deserialize<JsonElement>(tc.RawPartJson)
+                        : JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(new
+                        {
+                            functionCall = new
+                            {
+                                name = tc.Name,
+                                args = JsonSerializer.Deserialize<JsonElement>(tc.ArgumentsJson)
+                            }
+                        }))
+                ).ToList();
+
+                contents.Add(new { role = "model", parts = modelParts });
+
+                var responseParts = toolResults.Select(tr =>
+                {
+                    var parsed = JsonSerializer.Deserialize<JsonElement>(tr.ContentJson);
+                    var responseObj = parsed.ValueKind == JsonValueKind.Object
+                        ? parsed
+                        : JsonSerializer.Deserialize<JsonElement>(
+                            JsonSerializer.Serialize(new { result = parsed }));
+
+                    return (object)new
+                    {
+                        functionResponse = new
+                        {
+                            name = tr.ToolName,
+                            response = responseObj
+                        }
+                    };
+                }).ToList();
+
+                contents.Add(new { role = "user", parts = responseParts });
+            }
 
             return contents;
         }
@@ -69,6 +129,7 @@ namespace Clinic.Infrastructure.LLMs
         internal static LlmResponse ParseResponse(JsonElement json)
         {
             string? textContent = null;
+            var toolCalls = new List<LlmToolCall>();
 
             if (json.TryGetProperty("candidates", out var candidates)
                 && candidates.ValueKind == JsonValueKind.Array
@@ -86,13 +147,27 @@ namespace Clinic.Infrastructure.LLMs
                         {
                             textContent = textEl.GetString();
                         }
+                        else if (part.TryGetProperty("functionCall", out var fc))
+                        {
+                            var name = fc.GetProperty("name").GetString() ?? string.Empty;
+                            var args = fc.TryGetProperty("args", out var argsEl)
+                                ? argsEl.GetRawText()
+                                : "{}";
+                            toolCalls.Add(new LlmToolCall(
+                                Guid.NewGuid().ToString(), name, args,
+                                RawPartJson: part.GetRawText()));
+                        }
                     }
                 }
             }
 
+            var stopReason = toolCalls.Count > 0 ? LlmStopReason.ToolUse : LlmStopReason.EndTurn;
+
             return new LlmResponse
             {
-                TextContent = textContent
+                TextContent = textContent,
+                ToolCalls = toolCalls,
+                StopReason = stopReason
             };
         }
 

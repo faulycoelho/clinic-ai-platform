@@ -1,18 +1,22 @@
 ﻿using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain;
-using System.Text;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using static Clinic.Domain.Enums.ConversationEnums;
 
 namespace Clinic.Application.Services
 {
     public class ChatService(
         IConversationRepository conversationRepository,
-        IKnowledgeDocumentRepository  knowledgeDocumentRepository,
-        ILLMProvider llmProvider
+        ILLMProvider llmProvider,
+        ConversationToolRegistry toolRegistry,
+        ILogger<ChatService> logger
         ) : IChatService
     {
         //It should be configurable:
+        private const int CONFIG_MAX_TOOL_LOOP_ITERATIONS = 10;
+
         private const string CONFIG_WELCOME_MESSAGE = @"Hello!
             Welcome to CLINIC_AI.
             I'm the clinic's virtual assistant and can help you with appointment scheduling, rescheduling, cancellations, clinic information, and general questions.
@@ -76,7 +80,12 @@ namespace Clinic.Application.Services
                 conversation.Id, MessageRole.User, message.Content);
             conversation.AddMessage(userMsg);
 
-            var llmMessage = await CallChatLlmWithRag(message.Content, conversation);
+            var context = new ConversationContextDto(
+               conversation.Id,
+               conversation.ContactName,
+               conversation.ContactPhone);
+
+            var llmMessage = await RunToolLoopAsync(conversation, message.Content, context, ct);
 
             var assistantMsg = ConversationMessage.Create(
                 conversation.Id, MessageRole.Assistant, llmMessage);
@@ -86,53 +95,78 @@ namespace Clinic.Application.Services
 
             return new ChatMessageResponseDto(conversation.Id, llmMessage);
         }
-     
-        private async Task<string> CallChatLlmWithRag(string userMessage, Conversation conversation, CancellationToken ct = default)
+
+
+
+        internal async Task<string> RunToolLoopAsync(
+            Conversation conversation,
+            string userMessage,
+            ConversationContextDto context,
+            CancellationToken ct)
         {
-            var userMessageEmb = await llmProvider.GenerateEmbeddingAsync(userMessage, ct);
-            var docs = await knowledgeDocumentRepository.SearchByVectorAsync(userMessageEmb);
-
-            StringBuilder context = new StringBuilder();
-            foreach (var doc in docs)
-            {
-                context.AppendLine($"[Document Id]: {doc.DocumentId}"); 
-                context.AppendLine($"[Document Title]: {doc.DocumentTitle}"); 
-                context.AppendLine($"[Content]: {doc.Content}");
-                context.AppendLine("").AppendLine("");                
-            } 
-
-            var promptFinal = $"""
-                You are a question-answering assistant.
-
-                Strict rules:
-                - Answer ONLY using information explicitly contained in the provided context.
-                - Do NOT use prior knowledge, assumptions, or external information.
-                - Do NOT infer or extrapolate beyond what is directly stated.
-                - Every factual statement must include a citation to the source from which it was derived.
-                - If multiple sources support a statement, cite all relevant sources.
-                - If the answer cannot be found explicitly in the context, respond exactly with:
-                  "The requested information is not available in the provided context."
-                - Never fabricate citations.
-                - When you use the document [Content] give the citation with [Document Id] and [Document Title].
-
-                Context:
-                {context.ToString()}
-
-                Question:
-                {userMessage}
-
-                Answer:
-                """;
+            var tools = toolRegistry.GetAllTools();
+            var toolDefinitions = tools.Select(t =>
+                new LlmToolDefinition(t.Name, t.Description, t.ParametersJsonSchema)).ToList();
 
             var request = new LlmChatRequest
             {
                 SystemPrompt = CONFIG_SYSTEM_PROMPT,
                 History = conversation.Messages,
-                UserMessage = promptFinal
+                UserMessage = userMessage,
+                Tools = toolDefinitions
             };
 
-            var response = await llmProvider.ChatAsync(request);
-            return response?.TextContent ?? "";
+            for (var i = 0; i < CONFIG_MAX_TOOL_LOOP_ITERATIONS; i++)
+            {
+                var response = await llmProvider.ChatAsync(request, ct);
+
+                if (response.StopReason != LlmStopReason.ToolUse || response.ToolCalls.Count == 0)
+                {
+                    return response.TextContent ?? string.Empty;
+                }
+
+                var toolResults = new List<LlmToolResult>();
+                foreach (var toolCall in response.ToolCalls)
+                {
+                    var tool = toolRegistry.GetTool(toolCall.Name);
+                    if (tool is null)
+                    {
+                        logger.LogWarning("LLM requested unknown tool: {ToolName}", toolCall.Name);
+                        toolResults.Add(new LlmToolResult(
+                            toolCall.Id, toolCall.Name,
+                            JsonSerializer.Serialize(new { error = $"Unknown tool: {toolCall.Name}" }),
+                            IsError: true));
+                        continue;
+                    }
+
+                    try
+                    {
+                        var result = await tool.ExecuteAsync(toolCall.ArgumentsJson, context, ct);
+                        toolResults.Add(new LlmToolResult(toolCall.Id, toolCall.Name, result));
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Tool {ToolName} execution failed", toolCall.Name);
+                        toolResults.Add(new LlmToolResult(
+                            toolCall.Id, toolCall.Name,
+                            JsonSerializer.Serialize(new { error = ex.Message }),
+                            IsError: true));
+                    }
+                }
+
+                request = new LlmChatRequest
+                {
+                    SystemPrompt = CONFIG_SYSTEM_PROMPT,
+                    History = conversation.Messages,
+                    UserMessage = userMessage,
+                    Tools = toolDefinitions,
+                    PreviousAssistantToolCalls = response.ToolCalls,
+                    ToolResults = toolResults
+                };
+            }
+
+            logger.LogWarning("Tool loop reached max iterations ({Max})", CONFIG_MAX_TOOL_LOOP_ITERATIONS);
+            return "[Max tool iterations reached] Could not complete the request.";
         }
     }
 }
