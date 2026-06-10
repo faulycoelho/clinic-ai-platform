@@ -1,4 +1,5 @@
-﻿using Clinic.Domain;
+﻿using Clinic.Application.DTOs;
+using Clinic.Domain;
 
 namespace Clinic.Application.Interfaces
 {
@@ -11,5 +12,6 @@ namespace Clinic.Application.Interfaces
         Task<KnowledgeDocument> UpdateAsync(KnowledgeDocument doc, CancellationToken ct = default);
         Task DeleteAsync(int id, CancellationToken ct = default);
         Task<bool> HasAnyAsync(CancellationToken ct = default);
+        Task<List<DocumentDto>> SearchByVectorAsync(float[] queryEmbedding, int topK = 3);
     }
 }

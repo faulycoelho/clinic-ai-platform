@@ -1,4 +1,5 @@
-﻿using Clinic.Application.Interfaces;
+﻿using Clinic.Application.DTOs;
+using Clinic.Application.Interfaces;
 using Clinic.Domain;
 using Clinic.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +53,28 @@ namespace Clinic.Infrastructure.Repositories
                 await db.SaveChangesAsync(ct);
             }
         }
+
         public async Task<bool> HasAnyAsync(CancellationToken ct = default)
-        => await db.KnowledgeDocuments.AnyAsync(ct);
+            => await db.KnowledgeDocuments.AnyAsync(ct);
+
+        public async Task<List<DocumentDto>> SearchByVectorAsync(float[] queryEmbedding, int topK = 3)
+        {
+            return await db.Database
+             .SqlQuery<DocumentDto>(
+                 $"""
+                SELECT
+                    kd."Id" as "DocumentId",
+                    kd."Title" as "DocumentTitle",
+                    kdc."Content"
+                FROM "KnowledgeDocuments" kd
+                INNER JOIN "KnowledgeDocumentChunks" kdc ON kdc."KnowledgeDocumentId" = kd."Id"
+                WHERE kd."IsActive" = TRUE
+                  AND kd."ProcessingStatus" = {(int)Domain.Enums.DocumentProcessingStatus.Completed}
+                  AND kdc."Embedding" IS NOT NULL
+                ORDER BY kdc."Embedding" <=> {queryEmbedding}::vector
+                LIMIT {topK}
+                """)
+             .ToListAsync();
+        }
     }
 }

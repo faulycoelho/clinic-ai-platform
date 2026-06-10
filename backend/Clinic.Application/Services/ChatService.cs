@@ -1,13 +1,14 @@
 ﻿using Clinic.Application.DTOs;
 using Clinic.Application.Interfaces;
 using Clinic.Domain;
+using System.Text;
 using static Clinic.Domain.Enums.ConversationEnums;
 
 namespace Clinic.Application.Services
 {
     public class ChatService(
         IConversationRepository conversationRepository,
-        IKnowledgeDocumentChunkRepository  knowledgeDocumentChunkRepository,
+        IKnowledgeDocumentRepository  knowledgeDocumentRepository,
         ILLMProvider llmProvider
         ) : IChatService
     {
@@ -89,8 +90,16 @@ namespace Clinic.Application.Services
         private async Task<string> CallChatLlmWithRag(string userMessage, Conversation conversation, CancellationToken ct = default)
         {
             var userMessageEmb = await llmProvider.GenerateEmbeddingAsync(userMessage, ct);
-            var docs = await knowledgeDocumentChunkRepository.SearchByVectorAsync(userMessageEmb);
-            var context = string.Join("\n\n", docs);
+            var docs = await knowledgeDocumentRepository.SearchByVectorAsync(userMessageEmb);
+
+            StringBuilder context = new StringBuilder();
+            foreach (var doc in docs)
+            {
+                context.AppendLine($"[Document Id]: {doc.DocumentId}"); 
+                context.AppendLine($"[Document Title]: {doc.DocumentTitle}"); 
+                context.AppendLine($"[Content]: {doc.Content}");
+                context.AppendLine("").AppendLine("");                
+            } 
 
             var promptFinal = $"""
                 You are a question-answering assistant.
@@ -104,9 +113,10 @@ namespace Clinic.Application.Services
                 - If the answer cannot be found explicitly in the context, respond exactly with:
                   "The requested information is not available in the provided context."
                 - Never fabricate citations.
+                - When you use the document [Content] give the citation with [Document Id] and [Document Title].
 
                 Context:
-                {context}
+                {context.ToString()}
 
                 Question:
                 {userMessage}
