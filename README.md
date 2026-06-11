@@ -36,15 +36,6 @@ The agent follows the workflow below:
 - PostgreSQL + pgvector Vector Store
 - Top-K Similarity Retrieval
 
-# Using the AI Agent
-
-Once the application is running, you can interact with the Clinic AI Agent.
-
-Endpoint:
-POST /api/chat
-
-Use Scalar if running localhost: http://localhost:5000/scalar
-
 # API Setup
 
 This project uses Google's Gemini models as the LLM provider.
@@ -81,3 +72,13 @@ LLM_API_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 ## Step 3: Start the project:
 ```docker-compose up```
+
+
+# Using the AI Agent
+
+Once the application is running, you can interact with the Clinic AI Agent.
+
+Endpoint:
+POST /api/chat
+
+Use Scalar if running localhost: http://localhost:5000/scalar
