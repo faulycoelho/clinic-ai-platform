@@ -6,6 +6,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10  
     ports:
       - "5432:5432"
     volumes:
@@ -18,16 +23,22 @@ services:
       dockerfile: src/Clinic.API/Dockerfile
     container_name: clinic_api
     environment:
-      - ConnectionStrings__DefaultConnection=${POSTGRES_HOST}=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - LLM__LLM_MODEL_EMBEDDING=${LLM_MODEL_EMBEDDING}
+      - ConnectionStrings__DefaultConnection=Host=${POSTGRES_HOST};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - STORAGE__ENDPOINT=${STORAGE_ENDPOINT}
       - STORAGE__ACCESSKEY=${STORAGE_ACCESSKEY}
       - STORAGE__SECRETKEY=${STORAGE_SECRETKEY}
       - STORAGE__BUCKET=${STORAGE_BUCKET}
       - STORAGE__USESSL=${STORAGE_USESSL}
+      - LLM__LLM_PROVIDER=${LLM_PROVIDER}
+      - LLM__LLM_API_KEY=${LLM_API_KEY}
+      - LLM__LLM_MODEL=${LLM_MODEL}
+      - LLM__LLM_MODEL_EMBEDDING=${LLM_MODEL_EMBEDDING}      
     ports:
       - "5000:8080"     
     depends_on:
-      - postgres     
+      postgres:
+        condition: service_healthy    
     networks:
       - clinic-network
 

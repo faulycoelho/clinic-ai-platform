@@ -84,6 +84,28 @@ namespace Clinic.Infrastructure.LLMs
 
             contents.Add(new { role = "user", parts = new[] { new { text = request.UserMessage } } });
 
+            if (request.Context is not null)
+            {
+                contents.Add(new
+                {
+                    role = "user",
+                    parts = new[]
+                    {
+                        new
+                        {
+                            text =
+                                $$"""
+                                Conversation Context (authoritative):
+                                {{JsonSerializer.Serialize(request.Context)}}
+
+                                Use this information when relevant.
+                                Do not ask for these values again unless they are missing.
+                                """
+                        }
+                    }
+                });
+            }
+
             if (request.PreviousAssistantToolCalls is { Count: > 0 } toolCalls
                 && request.ToolResults is { Count: > 0 } toolResults)
             {

@@ -44,9 +44,6 @@ namespace Clinic.Infrastructure
 
             switch (llmOptions.Provider.ToLowerInvariant())
             {
-                case "anthropic":
-                    //ToDo: anthropic                    
-                    break;
                 case "gemini":
                     services.AddHttpClient<GeminiLlmProvider>();
                     services.AddScoped<ILLMProvider>(sp => sp.GetRequiredService<GeminiLlmProvider>());

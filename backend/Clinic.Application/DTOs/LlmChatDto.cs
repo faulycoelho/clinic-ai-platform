@@ -10,6 +10,7 @@ namespace Clinic.Application.DTOs
         public required IReadOnlyList<LlmToolDefinition> Tools { get; init; }
         public IReadOnlyList<LlmToolCall>? PreviousAssistantToolCalls { get; init; }
         public IReadOnlyList<LlmToolResult>? ToolResults { get; init; }
+        public object? Context { get; init; }
     }
 
     public sealed class LlmResponse
