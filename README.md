@@ -1,4 +1,6 @@
-# Clinic AI API
+# Clinic AI
+
+<img width="1536" height="1024" alt="Article_cover_image" src="https://github.com/user-attachments/assets/0cb58267-0b7a-4543-b930-5806fa995890" />
 
 Clinic AI is an AI Agent API.
 
